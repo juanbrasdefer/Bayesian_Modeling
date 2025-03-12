@@ -1,0 +1,28 @@
+// LINEAR REGRESSION MODEL
+
+// DATA BLOCK
+data {
+  int<lower=1> N;                 // Number of observations
+  int<lower=1> K;                 // Number of covariates (predictors)
+  matrix[N, K] x;                 // Predictors - respectability, age, sex, intercept
+  vector<lower=0, upper=1>[N] y;  // Outcome - sagging_pants, bounded because %
+}
+
+// PARAMETERS BLOCK
+parameters {
+  vector[K] beta;             // coefficients for X; must be 'vector', not 'real'!!!!
+  real<lower=0> sigma;        // bounding sigma to half-normal distribution
+}                             // no alpha because our intercept is included in cov matrix
+
+// MODEL BLOCK
+model {
+  // PRIORS: parameters distributed normal, centered around 0 with stdev 1
+  beta ~ normal(0, 1);
+  sigma ~ normal(0, 1);
+  
+  // LIKELIHOOD: 
+  // y follows a normal dist, and miu is replaced by beta * x
+  y ~ normal(x * beta, sigma); // again: no alpha (intercept) bc it's included in X 
+  
+}
+
