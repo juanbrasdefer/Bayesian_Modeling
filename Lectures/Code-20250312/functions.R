@@ -19,7 +19,8 @@ importCmdstanPosterior <- function(posterior_file, parameters, incl_warmup = FAL
   meta <- vroom::vroom(file = posterior_files,
                        delim = ",",
                        n_max = 44)
-  warmup_saved <- ifelse(as.integer(stringr::str_extract(meta[[1]][9], "[[:digit:]]+")) == 1L, TRUE, FALSE)
+  warmup_saved <- ifelse(is.na(as.integer(stringr::str_extract(meta[[1]][9], "[[:digit:]]+"))) ,FALSE, # extra check for NA val
+                         ifelse(as.integer(stringr::str_extract(meta[[1]][9], "[[:digit:]]+") == 1L, TRUE, FALSE)))
   if (warmup_saved) {
     warmup_draws <- stringr::str_extract(meta[[1]][8], "[[:digit:]]+") %>%
       as.integer()

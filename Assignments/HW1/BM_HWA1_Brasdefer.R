@@ -33,8 +33,8 @@
 # script prep --------------------------------------------------------------------------
 
 # packages
-library(here)
 pacman::p_load(here,
+               ggplot2,
                cmdstanr,
                dplyr,
                haven,
@@ -43,6 +43,9 @@ pacman::p_load(here,
                vroom,
                install = TRUE,
                update = FALSE)
+
+# import custom function
+source(here("Lectures/Code-20250312/functions.r")) 
 
 # working directory
 here::i_am("Assignments/HW1/BM_HWA1_Brasdefer.R")
@@ -153,7 +156,7 @@ lr_model <- "// LINEAR REGRESSION MODEL
 data {
   int<lower=1> N;                 // Number of observations
   int<lower=1> K;                 // Number of covariates (predictors)
-  matrix[N, K] x;                 // Predictors - respectability, age, sex, intercept
+  matrix[N, K] X;                 // Predictors - respectability, age, sex, intercept
   vector<lower=0, upper=1>[N] y;  // Outcome - sagging_pants, bounded because %
 }
 
@@ -170,9 +173,9 @@ model {
   sigma ~ normal(0, 1);
   
   // LIKELIHOOD: 
-  // y follows a normal dist, and miu is replaced by beta * x
-  y ~ normal(x * beta, sigma);  // again: no alpha (intercept) bc it's included in X 
-                                // also: x goes before beta
+  // y follows a normal dist, and miu is replaced by X * beta
+  y ~ normal(X * beta, sigma);  // again: no alpha (intercept) bc it's included in X 
+                                // also: X goes before beta
                                 // sigma error term (st dev)
 }
 "
@@ -206,15 +209,15 @@ lr_model_compiled <- cmdstan_model(here("Assignments/HW1/lr_model_punitive.stan"
 # we sample from the posterior
 fit <- lr_model_compiled$sample(
   data = data_stan, # our list of data and objects
-  chains = 4, # run 4 separate chains
+  seed = 1457L, # set our seed
+  chains = 4, # run 4 distinct chains
+  parallel_chains = 4,  # run chains in parallel
   iter_warmup = 1000, # default 1000
   iter_sampling = 500, # default 1000
   refresh = 50, # how often you get an update of where the chains are
-  output_dir = here("Assignments/HW1"), # save to
+  output_dir = here("Assignments/HW1/lr_model_sampling_outputs"), # save to
   output_basename = "lr_model_punitive_run" # name
 )
-
-
 
 
 
@@ -227,16 +230,70 @@ fit <- lr_model_compiled$sample(
 # Then, make use of the custom function to 
 # import only the posterior for the coefficient β related to the RSP score. 
 # Visualize the full posterior distribution of the β coefficient. 
-# In addition to the custom function for importing posterior files, 
-# you can use whatever R functions and packages you deem appropriate for this task.
+# In addition to the custom function for importing posterior files, you can use 
+# whatever R functions and packages you deem appropriate for this task.
 
 
 
+# estimation has been done; now we inspect results
+# basically a table with the classic regression diagnostics
+#fit$summary() # is one way of looking at our results
+# # can be a little nicer to look at
+fit$cmdstan_summary()
+
+# extract the posterior; then you can format as a matrix
+posterior <- fit$draws(format = "df") 
+#View(posterior)
 
 
+# we dont care too much about log probability (lp) column
+# we care about the beta and sigma columns
+# which show us the parameter results of all the iterations (excluding warmups)
+# you can take that and then create a histogram that shows you confidence intervals 
+# simply by using quantiles
+
+# set path to files of posteriors
+posterior_files <- c(here("Assignments/HW1/lr_model_sampling_outputs/lr_model_punitive_run-1.csv"), 
+                     here("Assignments/HW1/lr_model_sampling_outputs/lr_model_punitive_run-2.csv"),
+                     here("Assignments/HW1/lr_model_sampling_outputs/lr_model_punitive_run-3.csv"),
+                     here("Assignments/HW1/lr_model_sampling_outputs/lr_model_punitive_run-4.csv"))
+
+# use custom function to obtain the posterior for beta from stored files
+
+# NOTE: I had to edit the importCmdstanPosterior function
+# in the functions.R file
+# because the (warmup) check in the function could not handle NAs
+# it seems the \\d extraction from meta[[1]][9] returned a NA, 
+# which made the function explode (because it expected a digit)
+# with the new alteration, the below now runs
+
+beta_posterior_RSP <- posterior_files %>%
+  purrr::map_dfr(importCmdstanPosterior, 
+                 parameter = "beta",
+                 incl_warmup = FALSE) %>%
+  rename(beta_2_RSP = "beta.2") %>%
+  select(beta_2_RSP)
 
 
+# Visualize the full posterior distribution of the β coefficient. 
 
+ggplot(beta_posterior_RSP, 
+       aes(x = beta_2_RSP)) +
+  geom_histogram(bins = 100, 
+                 fill = "#9e59e3",
+                 color = "white", 
+                 alpha = 0.9) + 
+  theme_minimal(base_size = 14) +  # Clean and modern theme
+  labs(title = "Posterior Distribution of β 'RSP'",
+       subtitle = "Beta Coefficient for 'Responsibility' Metric",
+       x = "Parameter Value",
+       y = "Frequency") +
+  theme(plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
+        plot.subtitle = element_text(size = 12, hjust = 0.5),
+        axis.text = element_text(size = 12),
+        axis.title = element_text(face = "bold"),
+        panel.grid.major = element_line(color = "gray80", linetype = "dashed"),
+        panel.grid.minor = element_blank())  # Clean up minor grid lines
 
 
 

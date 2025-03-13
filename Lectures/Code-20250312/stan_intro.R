@@ -8,14 +8,13 @@
 #### PREPARATIONS =======================================================================
 
 # set working directory -----------------------------------------------------------------
-setwd("YOUR WORKING DIRECTORY")
 library(here)
-here::i_am("Code-20250312/stan_intro.R")
+here::i_am("Lectures/Code-20250312/stan_intro.R")
 
 
 # install and load packages -------------------------------------------------------------
-source(here("Code-20250312/packages.R"))
-source(here("Code-20250312/functions.R"))
+source(here("Lectures/Code-20250312/packages.R"))
+source(here("Lectures/Code-20250312/functions.R"))
 
 # set seed ------------------------------------------------------------------------------
 set.seed(2843)
@@ -28,7 +27,7 @@ set.seed(2843)
 # data source: https://doi.org/10.7910/DVN/MLZ39X
 
 # import data ---------------------------------------------------------------------------
-patronage_data <- read_dta(here("Code-20250312/localauthority_level.dta"))
+patronage_data <- read_dta(here("Lectures/Code-20250312/localauthority_level.dta"))
 
 # remove missings (no hires in a given year) --------------------------------------------
 patronage_data <- patronage_data %>%
@@ -123,7 +122,7 @@ fit <- lr_model_compiled$sample(
   iter_warmup = 500, # default 1000
   iter_sampling = 500, # default 1000
   refresh = 50, # how often you get an update of where the chains are
-  output_dir = "YOUR OUTPUT DIRECTORY",
+  output_dir = here("Lectures/Code-20250312/stan_intro_outputs"),
   output_basename = "lr_model"
 )
 
@@ -144,7 +143,9 @@ View(posterior)
 
 # use custom function to obtain the posterior for beta from stored files ----------------
 # aka just so we dont use it between session and closing R etc
-posterior_files <- c("lr_model-1.csv", "lr_model-2.csv", "lr_model-3.csv")
+posterior_files <- c(here("Lectures/Code-20250312/stan_intro_outputs/lr_model-1.csv"), 
+                     here("Lectures/Code-20250312/stan_intro_outputs/lr_model-2.csv"), 
+                     here("Lectures/Code-20250312/stan_intro_outputs/lr_model-3.csv"))
 beta_posterior <- posterior_files %>%
   purrr::map_dfr(importCmdstanPosterior, 
                  parameter = "beta")

@@ -4,7 +4,7 @@
 data {
   int<lower=1> N;                 // Number of observations
   int<lower=1> K;                 // Number of covariates (predictors)
-  matrix[N, K] x;                 // Predictors - respectability, age, sex, intercept
+  matrix[N, K] X;                 // Predictors - respectability, age, sex, intercept
   vector<lower=0, upper=1>[N] y;  // Outcome - sagging_pants, bounded because %
 }
 
@@ -21,8 +21,9 @@ model {
   sigma ~ normal(0, 1);
   
   // LIKELIHOOD: 
-  // y follows a normal dist, and miu is replaced by beta * x
-  y ~ normal(x * beta, sigma); // again: no alpha (intercept) bc it's included in X 
-  
+  // y follows a normal dist, and miu is replaced by X * beta
+  y ~ normal(X * beta, sigma);  // again: no alpha (intercept) bc it's included in X 
+                                // also: X goes before beta
+                                // sigma error term (st dev)
 }
 
