@@ -4,7 +4,7 @@
   "stan_minor_version" : "36",
   "stan_patch_version" : "0",
   "model_name" : "lr_model_punitive_model",
-  "start_datetime" : "2025-03-13 21:35:38 UTC",
+  "start_datetime" : "2025-03-18 19:28:33 UTC",
   "method" : {
     "value" : "sample",
     "sample" : {
@@ -45,7 +45,7 @@
   },
   "id" : 3,
   "data" : {
-    "file" : "\/var\/folders\/yg\/6cnm4nrd727_h_wts71sw3j40000gn\/T\/Rtmpj1WxrP\/standata-700158b1c6c4.json"
+    "file" : "\/var\/folders\/yg\/6cnm4nrd727_h_wts71sw3j40000gn\/T\/Rtmpi04oWE\/standata-cac65c3f9136.json"
   },
   "init" : "2",
   "random" : {

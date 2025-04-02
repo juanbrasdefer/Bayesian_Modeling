@@ -3,8 +3,8 @@
   "stan_major_version" : "2",
   "stan_minor_version" : "36",
   "stan_patch_version" : "0",
-  "model_name" : "lr_model_punitive_model",
-  "start_datetime" : "2025-03-18 19:28:33 UTC",
+  "model_name" : "lr_model_prior_predict_model",
+  "start_datetime" : "2025-03-18 19:57:56 UTC",
   "method" : {
     "value" : "sample",
     "sample" : {
@@ -43,24 +43,24 @@
       "num_chains" : 1
     }
   },
-  "id" : 4,
+  "id" : 1,
   "data" : {
-    "file" : "\/var\/folders\/yg\/6cnm4nrd727_h_wts71sw3j40000gn\/T\/Rtmpi04oWE\/standata-cac65c3f9136.json"
+    "file" : "\/var\/folders\/yg\/6cnm4nrd727_h_wts71sw3j40000gn\/T\/Rtmpi04oWE\/standata-cac6275f8a84.json"
   },
   "init" : "2",
   "random" : {
     "seed" : 1457
   },
   "output" : {
-    "file" : "\/Users\/Juan\/git\/Bayesian_Modeling\/Assignments\/HW1\/lr_model_sampling_outputs\/lr_model_punitive_run-4.csv",
+    "file" : "\/Users\/Juan\/git\/Bayesian_Modeling\/Assignments\/HW1\/lr_model_prior_predict_outputs\/lr_priorpredict_punitive_run-1.csv",
     "diagnostic_file" : "",
     "refresh" : 50,
     "sig_figs" : -1,
-    "profile_file" : "\/Users\/Juan\/git\/Bayesian_Modeling\/Assignments\/HW1\/lr_model_sampling_outputs\/lr_model_punitive-profile-4.csv",
+    "profile_file" : "\/Users\/Juan\/git\/Bayesian_Modeling\/Assignments\/HW1\/lr_model_prior_predict_outputs\/lr_model_prior_predict-profile-1.csv",
     "save_cmdstan_config" : true
   },
   "num_threads" : 1,
   "mpi_enabled" : false,
   "stanc_version" : "stanc3 v2.36.0",
-  "stancflags" : "--name=lr_model_punitive_model"
+  "stancflags" : "--name=lr_model_prior_predict_model"
 }

@@ -45,12 +45,72 @@ pacman::p_load(here,
                update = FALSE)
 
 # import custom function
-source(here("Lectures/Code-20250312/functions.r")) 
+# NOTE: no longer importing it as source() because we are defining it below instead
+# source(here("Lectures/Code-20250312/functions.r")) 
 
 # working directory
 here::i_am("Assignments/HW1/BM_HWA1_Brasdefer.R")
-setwd(here())
+setwd(here()) # we dont use this in this script, but may as well
 
+
+
+
+# Sascha Custom Function: importCmdstanPosterior -------------------------------------------
+
+# ALTERED SLIGHTLY, on line 72, as described in task 4
+# basically just had to make it handle NAs in the 'warmup saved' section
+
+# arguments:
+# posterior_file: path to the output posterior CSV file
+# parameters: parameters to import posterior for
+# incl_warmup: whether to include warmup draws (requires warmup to be stored in output CSV)
+
+importCmdstanPosterior <- function(posterior_file, parameters, incl_warmup = FALSE) {
+  # collect meta information
+  meta <- vroom::vroom(file = posterior_files,
+                       delim = ",",
+                       n_max = 44)
+  warmup_saved <- ifelse(is.na(as.integer(stringr::str_extract(meta[[1]][9], "[[:digit:]]+"))) ,FALSE, # extra check for NA val
+                         ifelse(as.integer(stringr::str_extract(meta[[1]][9], "[[:digit:]]+") == 1L, TRUE, FALSE)))
+  if (warmup_saved) {
+    warmup_draws <- stringr::str_extract(meta[[1]][8], "[[:digit:]]+") %>%
+      as.integer()
+  }
+  sampling_draws <- stringr::str_extract(meta[[1]][7], "[[:digit:]]+") %>%
+    as.integer()
+  # collect posterior with warmup draws
+  if (incl_warmup == TRUE) {
+    if (warmup_saved == FALSE) {
+      stop("Warmup draws not available.")
+    }
+    posterior <- vroom::vroom(posterior_files,
+                              delim = ",",
+                              comment = "# ",
+                              n_max = warmup_draws+sampling_draws,
+                              col_select = starts_with(parameters))
+    gc()
+  } else {
+    # in the presence of warmup draws, collect posterior without warmup draws
+    if (warmup_saved == TRUE) {
+      posterior <- vroom::vroom(posterior_files,
+                                delim = ",",
+                                comment = "# ",
+                                n_max = warmup_draws+sampling_draws,
+                                col_select = starts_with(parameters)) %>%
+        slice(warmup_draws+1:(warmup_draws+sampling_draws))
+      gc()
+      # absent warmup draws, collect posterior without warmup draws      
+    } else {
+      posterior <- vroom::vroom(posterior_files,
+                                delim = ",",
+                                comment = "# ",
+                                n_max = sampling_draws,
+                                col_select = starts_with(parameters))  
+      gc()
+    }
+  }
+  return(posterior)
+}
 
 
 
@@ -168,9 +228,9 @@ parameters {
 
 // MODEL BLOCK
 model {
-  // PRIORS: parameters distributed normal, centered around 0 with stdev 1
-  beta ~ normal(0, 1);
-  sigma ~ normal(0, 1);
+  // PRIORS: parameters distributed normal and lognormal, centered around 0 with stdev 1
+  beta ~ normal(0, 1);  // a normal prior for the coefficients
+  sigma ~ lognormal(0, 1);  // a lognormal prior for the st. dev.
   
   // LIKELIHOOD: 
   // y follows a normal dist, and miu is replaced by X * beta
@@ -185,7 +245,7 @@ write(lr_model, here("Assignments/HW1/lr_model_punitive.stan"))
 
 
 
-# TASK 3 --------------------------------------------------------------------------------
+# TASK 3, Compile and Run -----------------------------------------------------------------
 
 # In R, compile your Stan program using the cmdstanr R package. 
 # Next, given the Stan program and data you prepared, 
@@ -201,9 +261,6 @@ write(lr_model, here("Assignments/HW1/lr_model_punitive.stan"))
 # compile model 
 lr_model_compiled <- cmdstan_model(here("Assignments/HW1/lr_model_punitive.stan"))
 
-# NEED TO FIGURE OUT PARALLELLIZATION
-# seems to be page 346 ish of users guide
-# looks like you define parallellization in the FUNCTIONS block
 
 # our model has attribute $sample that we can use, so:
 # we sample from the posterior
@@ -224,7 +281,7 @@ fit <- lr_model_compiled$sample(
 
 
 
-# TASK 4 --------------------------------------------------------------------------------
+# TASK 4, Analyze Posterior  -------------------------------------------------------------
 
 # In R, print a summary of the posterior samples. 
 # Then, make use of the custom function to 
@@ -268,40 +325,43 @@ posterior_files <- c(here("Assignments/HW1/lr_model_sampling_outputs/lr_model_pu
 # with the new alteration, the below now runs
 
 beta_posterior_RSP <- posterior_files %>%
-  purrr::map_dfr(importCmdstanPosterior, 
-                 parameter = "beta",
-                 incl_warmup = FALSE) %>%
-  rename(beta_2_RSP = "beta.2") %>%
-  select(beta_2_RSP)
+  purrr::map_dfr(importCmdstanPosterior, # custom function
+                 parameter = "beta", # our desired parameter to pull
+                 incl_warmup = FALSE) %>% # ignore warmup portion of chain
+  rename(beta_2_RSP = "beta.2") %>% # quick name change for easier R manipulation
+  select(beta_2_RSP) # retain only this column
 
 
-# Visualize the full posterior distribution of the β coefficient. 
-
-ggplot(beta_posterior_RSP, 
-       aes(x = beta_2_RSP)) +
-  geom_histogram(bins = 100, 
-                 fill = "#9e59e3",
+# visualize the full posterior distribution of the β coefficient. 
+# histogram
+beta_posterior_RSP %>%
+  ggplot(aes(x = beta_2_RSP)) +
+  geom_histogram(bins = 100, # width
+                 fill = "#9e59e3", # visual style
                  color = "white", 
                  alpha = 0.9) + 
-  theme_minimal(base_size = 14) +  # Clean and modern theme
-  labs(title = "Posterior Distribution of β 'RSP'",
-       subtitle = "Beta Coefficient for 'Responsibility' Metric",
+  theme_minimal(base_size = 14) +  
+  labs(title = "Posterior Distribution of β 'RSP'", # title of graph
+       subtitle = "Beta Coefficient for 'Responsibility' Metric", # specify RSP meaning
        x = "Parameter Value",
        y = "Frequency") +
-  theme(plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
+  theme(plot.title = element_text(face = "bold", size = 16, hjust = 0.5), # visual style
         plot.subtitle = element_text(size = 12, hjust = 0.5),
         axis.text = element_text(size = 12),
         axis.title = element_text(face = "bold"),
         panel.grid.major = element_line(color = "gray80", linetype = "dashed"),
-        panel.grid.minor = element_blank())  # Clean up minor grid lines
+        panel.grid.minor = element_blank())
+
+# save histogram to outputs file 
+ggsave(here("Assignments/HW1/outputs/graph_posteriordist_RSP.png"))
 
 
-
-# OPTIONAL BONUS TASK --------------------------------------------------------------------------------
+# OPTIONAL BONUS TASK, Code ---------------------------------------------------------------
 
 # Alter your Stan program to use the generated quantities block 
 # in order to conduct a prior predictive check 
 # with priors specified as above. 
+
 # Having run the prior predictive check, 
 # are the original priors for β and σ sensible in this context?
 
@@ -309,16 +369,164 @@ ggplot(beta_posterior_RSP,
 
 
 
+# in order to do this, we define a model where our X data has 
+# the same structure as before, but without a y
+
+lr_model_prior_predict <- " 
+// data block
+data {
+  int<lower=1> N; 
+  int<lower=1> K; 
+  matrix[N, K] X;           // only X
+}
+
+// parameters block
+parameters {
+  vector[K] beta;
+  real<lower=0> sigma; 
+}
+  
+// model block
+model {
+  // priors only, no likelihood for a prior predictive check
+beta ~ normal(0,1);         // X coefficients normal
+sigma ~ lognormal(0,1);     // st dev lognormal
+}
+
+// generated quantities block!
+generated quantities {
+  vector[N] y_prior;        // prior predictive draws
+  for (n in 1:N) {          // for loop that runs model iterations
+  y_prior[n] = normal_rng(X[n] * beta, sigma); 
+  } 
+}
+"
 
 
 
 
 
 
+# save as .stan file 
+write(lr_model_prior_predict, here("Assignments/HW1/lr_model_prior_predict.stan"))
+
+# # reload model for prior predictive check and compile
+lr_model_prior_predict_compiled <- cmdstan_model(here("Assignments/HW1/lr_model_prior_predict.stan"))
+
+# run sampling from priors
+fit_prior_pred <- lr_model_prior_predict_compiled$sample(
+  data = list(N = data_stan$N, 
+              K = data_stan$K, 
+              X = data_stan$X), # since we only want specific attributes this time
+  seed = 1457L, # set seed
+  chains = 4, # 4 chains
+  iter_sampling = 500, # default 1000
+  iter_warmup = 1000, # default 1000
+  parallel_chains = 4, # run in parallel
+  refresh = 50, # show progress every 50
+  output_dir = here("Assignments/HW1/lr_model_prior_predict_outputs"),
+  output_basename = "lr_priorpredict_punitive_run"
+)
 
 
 
 
+# set path to files of posteriors
+priorpred_posterior_files <- c(here("Assignments/HW1/lr_model_prior_predict_outputs/lr_priorpredict_punitive_run-1.csv"), 
+                               here("Assignments/HW1/lr_model_prior_predict_outputs/lr_priorpredict_punitive_run-2.csv"),
+                               here("Assignments/HW1/lr_model_prior_predict_outputs/lr_priorpredict_punitive_run-3.csv"),
+                               here("Assignments/HW1/lr_model_prior_predict_outputs/lr_priorpredict_punitive_run-4.csv"))
+
+# use custom function to obtain the posterior for beta from stored files
+# use edited importCmdstanPosterior function
+beta_priorpred_posterior_RSP <- priorpred_posterior_files %>%
+  purrr::map_dfr(importCmdstanPosterior, # custom function
+                 parameter = "beta", # our desired parameter to pull
+                 incl_warmup = FALSE) %>% # ignore warmup portion of chain
+  rename(beta_2_RSP = "beta.2") %>% # quick name change for easier R manipulation
+  select(beta_2_RSP) # retain only this column
+
+# repeat for sigma
+sigma_priorpred_posterior_RSP <- priorpred_posterior_files %>%
+  purrr::map_dfr(importCmdstanPosterior, # custom function
+                 parameter = "sigma", # our desired parameter to pull
+                 incl_warmup = FALSE) %>% # ignore warmup portion of chain
+  select(sigma) # retain only this column
+
+
+
+
+
+# visualize the full posterior distribution of the β coefficient. 
+# histogram
+beta_priorpred_posterior_RSP %>%
+  ggplot(aes(x = beta_2_RSP)) +
+  geom_histogram(bins = 100, # width
+                 fill = "#d13dd1", # visual style
+                 color = "white", 
+                 alpha = 0.9) + 
+  theme_minimal(base_size = 14) +  
+  labs(title = "Prior Predict Posterior Distribution of β 'RSP'", # title of graph
+       subtitle = "In Prior Predictive Check, Coefficient for 'Responsibility'", # specify RSP meaning
+       x = "Parameter Value",
+       y = "Frequency") +
+  theme(plot.title = element_text(face = "bold", size = 16, hjust = 0.5), # visual style
+        plot.subtitle = element_text(size = 12, hjust = 0.5),
+        axis.text = element_text(size = 12),
+        axis.title = element_text(face = "bold"),
+        panel.grid.major = element_line(color = "gray80", linetype = "dashed"),
+        panel.grid.minor = element_blank())
+
+# save
+ggsave(here("Assignments/HW1/outputs/graph_beta_priorpred_posterior_RSP.png"))
+
+
+
+# visualize the full posterior distribution of the β coefficient. 
+# histogram
+sigma_priorpred_posterior_RSP %>%
+  ggplot(aes(x = sigma)) +
+  geom_histogram(bins = 100, # width
+                 fill = "#1dccba", # visual style
+                 color = "white", 
+                 alpha = 0.9) + 
+  theme_minimal(base_size = 14) +  
+  labs(title = "Prior Predict Posterior Distribution of Sigma", # title of graph
+       subtitle = "In Prior Predictive Check, Standard Deviation'", # specify RSP meaning
+       x = "Parameter Value",
+       y = "Frequency") +
+  theme(plot.title = element_text(face = "bold", size = 16, hjust = 0.5), # visual style
+        plot.subtitle = element_text(size = 12, hjust = 0.5),
+        axis.text = element_text(size = 12),
+        axis.title = element_text(face = "bold"),
+        panel.grid.major = element_line(color = "gray80", linetype = "dashed"),
+        panel.grid.minor = element_blank())
+
+# save
+ggsave(here("Assignments/HW1/outputs/graph_sigma_priorpred_posterior_RSP.png"))
+
+
+
+
+# OPTIONAL BONUS TASK, Interpretation ----------------------------------------------------------
+
+# Having run the prior predictive check,
+# the original priors for β and σ are a mixed bag in terms of being sensible choices
+
+# First, we look at the histogram for values of the posterior for Beta RSP.
+# Comparing this to the Prior Predictive posterior for the same covariate, 'RSP'
+# in the prior predictive model, we see that it ends up with a very similar density 
+# function shape (or rather: frequency distribution shape) as to that of the base RSP posterior distribution
+# However, the scale of the distribution (in other words: its variance) is very different
+# The Prior Predictive distribution's RSP Beta posterior shows us that, actually
+# the original choice for the Beta prior as normal dist (0, 1) was not a sensible choice
+
+# On the other hand, sigma seems to have fared better.
+# Looking at the graph for the frequency distribution of sigma from our new,
+# Prior Pedictive Posterior model, we see a strong centering of values
+# around 1, which tells us that our original prior of lognormal (0, 1) was sensible
+# Note: while the limit of values goes very far on the x-axis, 
+# the strung clustering around 1 means this is not so concerning for us
 
 
 

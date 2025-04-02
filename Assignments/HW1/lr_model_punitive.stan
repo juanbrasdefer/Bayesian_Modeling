@@ -16,9 +16,9 @@ parameters {
 
 // MODEL BLOCK
 model {
-  // PRIORS: parameters distributed normal, centered around 0 with stdev 1
-  beta ~ normal(0, 1);
-  sigma ~ normal(0, 1);
+  // PRIORS: parameters distributed normal and lognormal, centered around 0 with stdev 1
+  beta ~ normal(0, 1);  // a normal prior for the coefficients
+  sigma ~ lognormal(0, 1);  // a lognormal prior for the st. dev.
   
   // LIKELIHOOD: 
   // y follows a normal dist, and miu is replaced by X * beta
