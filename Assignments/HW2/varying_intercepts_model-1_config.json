@@ -4,7 +4,7 @@
   "stan_minor_version" : "36",
   "stan_patch_version" : "0",
   "model_name" : "varying_intercepts_model_model",
-  "start_datetime" : "2025-04-05 10:40:02 UTC",
+  "start_datetime" : "2025-04-05 13:11:25 UTC",
   "method" : {
     "value" : "sample",
     "sample" : {
@@ -45,7 +45,7 @@
   },
   "id" : 1,
   "data" : {
-    "file" : "\/var\/folders\/yg\/6cnm4nrd727_h_wts71sw3j40000gn\/T\/Rtmp2fZhxR\/standata-2de4f264b38.json"
+    "file" : "\/var\/folders\/yg\/6cnm4nrd727_h_wts71sw3j40000gn\/T\/RtmpfiCTsc\/standata-1d6f557e450b.json"
   },
   "init" : "2",
   "random" : {

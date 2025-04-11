@@ -6,7 +6,7 @@ data {
   int<lower=1> JT;                    // Number of judge year pairs
   array[N] int<lower=1, upper=J> jj;  // Judge ID
   array[N] int<lower=1, upper=nT> tt; // Year ID
-  array[N] int<lower=1, upper=nT> jt; // Judge Year ID
+  array[N] int<lower=1, upper=JT> jt; // Judge Year ID
   array[N] int<lower=0, upper=1> y;   // Outcome, sentence (0/1)
 }
 

@@ -133,7 +133,7 @@ data {
   int<lower=1> JT;                    // Number of judge year pairs
   array[N] int<lower=1, upper=J> jj;  // Judge ID
   array[N] int<lower=1, upper=nT> tt; // Year ID
-  array[N] int<lower=1, upper=nT> jt; // Judge Year ID
+  array[N] int<lower=1, upper=JT> jt; // Judge Year ID
   array[N] int<lower=0, upper=1> y;   // Outcome, sentence (0/1)
 }
 
@@ -316,6 +316,13 @@ court_check <- sentencing_data2_processed %>%
 sentencing_data2_processed <- sentencing_data2_processed %>%
   mutate(c_id = as.integer(as.factor(c_id)))   # just good habit-forming!
 
+# need to boil down to judge level for the list
+sentencing_d2p_judgelevel <- sentencing_data2_processed %>%
+  group_by(j_id) %>%
+  summarize(c_id = first(c_id)) %>% # need to do because of the one judge with 2 courts
+  ungroup() 
+
+
 # prepare data again for stan
 data_stan <- list(
   N = nrow(sentencing_data2_processed),                      # number of observations
@@ -327,13 +334,13 @@ data_stan <- list(
   tt = as.integer(factor(sentencing_data2_processed$year)),  # year ID (converted to integer)         
   jt = as.integer(factor(sentencing_data2_processed$year)),  # judge year ID (converted to integer) 
   c = as.integer(factor(sentencing_data2_processed$c_id)),   # court ID (converted to integer) 
+  jc = as.integer(factor(sentencing_d2p_judgelevel$c_id)),   # mapping courts to judges at the judge level
   y = sentencing_data2_processed$sentence                    # Outcome variable: sentence (0 or 1)
 )
 
 
 # now we define our stan model 
 # we add our new parameter, court id
-
 varying_intercepts_model_c <- "
 data {
   int<lower=1> N;                     // Number of observations
@@ -343,9 +350,11 @@ data {
   int<lower=1> C;                     // Number of courts
   array[N] int<lower=1, upper=J> jj;  // Judge ID
   array[N] int<lower=1, upper=nT> tt; // Year ID
-  array[N] int<lower=1, upper=nT> jt; // Judge Year ID
+  array[N] int<lower=1, upper=JT> jt; // Judge Year ID
   array[N] int<lower=1, upper=C> c;   // Court ID
   array[N] int<lower=0, upper=1> y;   // Outcome, sentence (0/1)
+  array[J] int<lower=1, upper=C> jc;  // Court judge mix
+
 }
 
 parameters {
@@ -354,7 +363,6 @@ parameters {
   real<lower=0> sigma_gamma;          // Standard deviation across years
   real<lower=0> sigma_delta;          // Standard deviation across judge years
   real<lower=0> sigma_epsilon;        // Standard deviation across courts
-
 
   vector[J] alpha;                    // Judge-level intercepts
   vector[nT] gamma;                   // Year-level intercepts
@@ -366,18 +374,18 @@ parameters {
 
 model {
   // Hyperpriors
-  mu_alpha ~ student_t(3, 0, 1);                // only judges get mu
+  mu_epsilon ~ student_t(3, 0, 1);              // NOW: only courts get mu 
   sigma_alpha ~ student_t(3, 0, 1) T[0.01, ];   // our sigmas were creating errors
   sigma_gamma ~ student_t(3, 0, 1) T[0.01, ];   // 'Scale parameter is 0, but must be positive!'
   sigma_delta ~ student_t(3, 0, 1) T[0.01, ];   // so we add a tiny lower bound to stop that
-  sigma_epsilon ~ student_t(3, 0, 1) T[0.01, ]; // our new guy
+  sigma_epsilon ~ student_t(3, 0, 1) T[0.01, ]; // new st dev for courts
 
   
   // Priors (for the actual intercepts)
-  alpha ~ normal(mu_alpha, sigma_alpha); // distributed around its hyperparameters
-  gamma ~ normal(0, sigma_gamma);        // distributed around 0 and its st dev
-  delta ~ normal(0, sigma_delta);        // distributed around 0 and its st dev
-  epsilon ~ normal(0, sigma_epsilon);    // distributed around 0 and its st dev
+  alpha ~ normal(epsilon[jc], sigma_alpha);       // distributed according to courts because of nesting
+  gamma ~ normal(0, sigma_gamma);                 // distributed around 0 and its st dev
+  delta ~ normal(0, sigma_delta);                 // distributed around 0 and its st dev
+  epsilon ~ normal(mu_epsilon, sigma_epsilon);    // now courts is the one that gets the overall mu
 
   
   // Likelihood
