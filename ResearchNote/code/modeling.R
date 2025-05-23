@@ -130,9 +130,12 @@ fit_repvote <- brm(
   control = list(adapt_delta = 0.95, max_treedepth = 15),
   seed = 42)
 
+saveRDS(fit_repvote, file = here("ResearchNote/data/fit_repvote_model.rds"))
+
 # took 7 mins... crazy fast actually
  
 # 5 - Chain Diagnostics ---------------------------------------------------
+fit_repvote <- readRDS(here("ResearchNote/data/fit_repvote_model.rds"))
 
 ### 5.1 - TracePlots----------------------------------------------------------
 # Traceplots show the sampled values of a parameter over iterations for each MCMC chain
@@ -150,47 +153,50 @@ fit_repvote <- brm(
 posterior_samples <- as_draws_array(fit_repvote)
 
 # 2 - traceplot for specific parameters, covariates
-mcmc_trace(posterior_samples, pars = c("b_intercept",
-                                       "b_leftright_self", 
+mcmc_trace(posterior_samples, pars = c("b_leftright_self", 
                                        "b_therm_dems", 
-                                       "b_therm_reps"))
+                                       "b_therm_reps")) +
+  labs(title = "Traceplot for Chain Convergence",
+       subtitle = "Diagnostics of Variance, Convergence, Trends for Fixed Effects") 
+ggsave(here("ResearchNote/outputs/diagnostics/traceplot_fixed_effects.png"), width = 14, height = 6, dpi = 300)
 
-# 2 - traceplot for specific parameter, intercept
-# mcmc_trace(posterior_samples, pars = c("b_intercept"))
-# might not need to do; covariates might be enough
+#trace plots looks fantastic; we have:
+# A) Well-mixed chains (overlapping chains, "fuzzy caterpillars")
+      # meaning they’ve explored the posterior space fully and evenly.
+# B) No obvious trends or drift: 
+      # our chains are not stuck in one region or slowly drifting.
+# C) No divergence between chains: 
+      # are chains are not going to different regions, so we have good mixing AND convergence.
+
 
 
 # 5.2 - RHat --------------------------------------------------------------
-#R-Hat compares within-chain and between-chain variability
+# R-Hat compares within-chain and between-chain variability
+# When all chains have converged to the same posterior distribution, R-hat ≈ 1.00.
 
-# When all chains have converged to the same 
-    # posterior distribution, R-hat ≈ 1.00.
-# A high R-hat (typically > 1.01) suggests 
-    # non-convergence or poor mixing.
-
-#1.00 → Good.
-# >1.01 → Needs attention.
-# >1.1 → Definitely problematic.
+# R-hat ≈ 1.00 is Good.
+# R-hat > 1.01  needs attention, suggests  non-convergence or poor mixing
+# R-hat > 1.1 is definitely problematic
 
 summary(fit_repvote)
 # note that this is the group-level (random effects) summary
 # so sd is standard deviations of the varying effects across income levels
 # and cor tells correlations among those random effects
 
-#Multilevel Hyperparameters:
-#  ~income_level (Number of levels: 11)
-                               # Estimate Est.Error l-95% CI u-95% CI Rhat
-# sd(Intercept)                      0.39      0.32     0.01     1.19 1.00
-# sd(leftright_self)                 0.09      0.06     0.00     0.24 1.00
-# sd(therm_dems)                     4.65      1.04     2.86     6.92 1.00
-# sd(therm_reps)                     4.25      1.01     2.40     6.35 1.00
-# cor(Intercept,leftright_self)     -0.16      0.45    -0.89     0.75 1.00
-# cor(Intercept,therm_dems)         -0.01      0.46    -0.82     0.82 1.00
-# cor(leftright_self,therm_dems)    -0.11      0.46    -0.88     0.76 1.00
-# cor(Intercept,therm_reps)         -0.05      0.46    -0.84     0.80 1.00
-# cor(leftright_self,therm_reps)     0.01      0.45    -0.80     0.83 1.00
-# cor(therm_dems,therm_reps)        -0.94      0.06    -0.99    -0.77 1.00
+# Multilevel Hyperparameters:
+#   ~income_level (Number of levels: 11) 
+#                       Estimate Est.Error l-95% CI u-95%CI Rhat 
+# sd(Intercept)          0.29      0.17     0.02     0.70   1.00     
+# sd(leftright_self)     0.27      0.12     0.06     0.55   1.00
+# sd(therm_dems)         0.86      0.23     0.53     1.40   1.00
+# sd(therm_reps)         0.79      0.21     0.48     1.30   1.00
 
+# Regression Coefficients:
+#                Estimate   Est.Error l-95% CI u-95% CI     Rhat 
+# Intercept         -0.67      0.14    -0.96    -0.39       1.00     
+# leftright_self     0.12      0.05     0.01     0.22       1.00     
+# therm_dems        -0.06      0.05    -0.16     0.03       1.00     
+# therm_reps         0.08      0.05    -0.01     0.19       1.00
 
 # looks like all our Rhats are == 1 
 # which is great
@@ -218,17 +224,20 @@ summary(fit_repvote)
     # <100 is concerning, especially if concentrated in important parameters
     # Tail ESS < 100 means posterior intervals may be unstable
 
-#                                 Bulk_ESS  Tail_ESS
-# sd(Intercept)                      3549     3369
-# sd(leftright_self)                 2576     3714
-# sd(therm_dems)                     3040     4439
-# sd(therm_reps)                     3154     3854
-# cor(Intercept,leftright_self)      4810     5014
-# cor(Intercept,therm_dems)           665     1993
-# cor(leftright_self,therm_dems)      881     2202
-# cor(Intercept,therm_reps)           701     2135
-# cor(leftright_self,therm_reps)      941     2480
-# cor(therm_dems,therm_reps)         3975     6017
+# Multilevel Hyperparameters:
+#   ~income_level (Number of levels: 11) 
+#                   Bulk_ESS  Tail_ESS
+# sd(Intercept)        2197     2333
+# sd(leftright_self)   1848     2057
+# sd(therm_dems)       1357     2789
+# sd(therm_reps)       1394     3194
+
+# Regression Coefficients:
+#                     Bulk_ESS  Tail_ESS
+# Intercept              4760     5050
+# leftright_self         3245     4094
+# therm_dems             7750     5984
+# therm_reps             7536     6106
 
 # looks like all of our estimated parameters have both
 # BULK and TAIL ESS greater than 400
@@ -237,30 +246,18 @@ summary(fit_repvote)
 
 
 
-# if we look at the overall, we see that Rhat and ESS are even healthier than at the
-# income_level level
-
-# Regression Coefficients:
-#   Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-# Intercept         -2.01      0.46    -2.91    -1.08 1.00     1862     4238
-# leftright_self     0.28      0.08     0.10     0.45 1.00     1447     2359
-# therm_dems        -1.72      0.98    -3.61     0.21 1.00     3728     4701
-# therm_reps         1.89      1.00    -0.10     3.90 1.00     4052     4567
-
-
-
 # 6 - Posterior Summaries ---------------------------------------------------------
-# 1 - simple estimate check
+# 6.1 - simple estimate check -------------------------------------------------
 summary(fit_repvote)
 
 # Regression Coefficients:
-#                Estimate Est.Error   l-95% CI  u-95% CI
-# Intercept         -2.01      0.46    -2.91    -1.08 
-# leftright_self     0.28      0.08     0.10     0.45 
-# therm_dems        -1.72      0.98    -3.61     0.21 
-# therm_reps         1.89      1.00    -0.10     3.90 
+#                Estimate   Est.Error l-95% CI u-95% CI     Rhat 
+# Intercept         -0.67      0.14    -0.96    -0.39       1.00     
+# leftright_self     0.12      0.05     0.01     0.22       1.00     
+# therm_dems        -0.06      0.05    -0.16     0.03       1.00     
+# therm_reps         0.08      0.05    -0.01     0.19       1.00 
 # we see that 
-# global intercept is -2.01, likely meaning that people are not
+# global intercept is -0.67, meaning that people are not
     # very likely to vote for republicans
     # that's fine; makes sense with the fact that the dataset includes independent voting too
     # and that it was crazy skewed towards democrats for some reason (bad surveying?)
@@ -269,75 +266,60 @@ summary(fit_repvote)
 # therm dems has the expected negative prediciton ability
     # interestingly, the confidence interval includes 0, which is not fantastic
     # means that there's a chance that coefficient on dems is actually positive...
-    # i think
-# therm reps has the largest predictive ability
-    # but with similar concerns as the dem therm, being that it includes 0 in its CI
-
+# therm reps has similar concerns as the dem therm, being that it includes 0 in its CI
+# OVERALL: the fact that these coefficients are super small is
+    # potentially explained by how much larger they are by income group
+    # ie: we were correct to make varying intercepts and varying slopes
+    # since it seems that actually groups vary a lot in both directions
 
 # Multilevel Hyperparameters:
-#   ~income_level (Number of levels: 11)
-#                               Estimate    Est.Error  l-95% CI  u-95% 
-# sd(Intercept)                      0.39      0.32     0.01     1.19
-# sd(leftright_self)                 0.09      0.06     0.00     0.24 
-# sd(therm_dems)                     4.65      1.04     2.86     6.92 
-# sd(therm_reps)                     4.25      1.01     2.40     6.35 
-# cor(Intercept,leftright_self)     -0.16      0.45    -0.89     0.75 
-# cor(Intercept,therm_dems)         -0.01      0.46    -0.82     0.82 
-# cor(leftright_self,therm_dems)    -0.11      0.46    -0.88     0.76 
-# cor(Intercept,therm_reps)         -0.05      0.46    -0.84     0.80 
-# cor(leftright_self,therm_reps)     0.01      0.45    -0.80     0.83 
-# cor(therm_dems,therm_reps)        -0.94      0.06    -0.99    -0.77 
-# we see that left right has very little deviation across income levels
-# we see that therms have huge deviations across income levels, but super flat dist and massive CIs
+#   ~income_level (Number of levels: 11) 
+#                       Estimate Est.Error l-95% CI u-95%CI Rhat 
+# sd(Intercept)          0.29      0.17     0.02     0.70   1.00     
+# sd(leftright_self)     0.27      0.12     0.06     0.55   1.00
+# sd(therm_dems)         0.86      0.23     0.53     1.40   1.00
+# sd(therm_reps)         0.79      0.21     0.48     1.30   1.00
+# we see that intercept has deviation of about half of its global effect size
+# left right has more than double the deviation of its effect size
+# dem and rep have unbelievably large deviation compared to the pop average coeff
+      # tells that varying intercepts was an important decision for these variables
 
 
-# 2. Extract the posterior draws for deeper inspection:
+
+# 6.2 - Visualization of estimates -------------------------------------------------
+# extract the posterior draws for deeper inspection:
 post <- as_draws_df(fit_repvote)
 
-# 3. Visualize central estimates and intervals:
+# visualize central estimates and intervals:
 # all three covs
 mcmc_areas(
   posterior::subset_draws(post, variable = c("b_leftright_self", "b_therm_dems", "b_therm_reps")),
   pars = c("b_leftright_self", "b_therm_dems", "b_therm_reps"),
-  prob = 0.95
-)
-# one var at a time
-mcmc_areas(
-  posterior::subset_draws(post, variable = "b_leftright_self"),
-  pars = c("b_leftright_self"),
-  prob = 0.95
-)
+  prob = 0.95) +
+  labs(title = "Posterior Draws - Covariate Population Estimates",
+       subtitle = "Global Estimates and Intervals for Covariates") 
+ggsave(here("ResearchNote/outputs/posterior/posteriorsummaries_covariates.png"), width = 14, height = 6, dpi = 300)
 
-# 4 visualize sd for each cov
-# not sure what this one shows or means
+
+
+# visualize sd for each covaritate
 mcmc_areas(
   posterior::subset_draws(post, variable = c("sd_income_level__Intercept", "sd_income_level__leftright_self", 
                                              "sd_income_level__therm_dems", "sd_income_level__therm_reps")),
   pars = c("sd_income_level__Intercept", "sd_income_level__leftright_self", 
            "sd_income_level__therm_dems", "sd_income_level__therm_reps"),
-  prob = 0.95
-)
+  prob = 0.95) +
+  labs(title = "Posterior Draws - Standard Deviations",
+       subtitle = "S.D. Across Group-Level (Income) Estimates") 
+ggsave(here("ResearchNote/outputs/posterior/posteriorsummaries_stdevs.png"), width = 14, height = 6, dpi = 300)
 
 
+# POTENTIALLY THE GRAPH TO SHOW
 # income_level parameters - old
 fit_draws <- fit_repvote %>%
   spread_draws(r_income_level[income_level, term]) %>%
   filter(income_level %in% c(1:11),  # pick income groups to focus on
          term %in% c("Intercept", "leftright_self", "therm_dems", "therm_reps"))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -363,11 +345,6 @@ posterior_summary %>%
   labs(title = "P(Republican Vote) by Income Group",
        x = "Income Group", y = "Posterior Mean Probability") +
   theme_minimal()
-
-
-
-
-
 
 
 
