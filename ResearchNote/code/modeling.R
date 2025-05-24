@@ -107,7 +107,7 @@ intercept <- rnorm(n_draws, 0, 1)
 eta <- intercept + b1*5 + b2*5 + b3*5
 hist(plogis(eta), breaks = 50)
 
-# 3.1 Plot Prior Predictive Checks ---------------------------------------
+### 3.1 Plot Prior Predictive Checks ---------------------------------------
 # Posterior predictive checks using *prior* draws
 pp_check(prior_check_model, ndraws = 100)
 
@@ -134,7 +134,7 @@ saveRDS(fit_repvote, file = here("ResearchNote/data/fit_repvote_model.rds"))
 
 # took 7 mins... crazy fast actually
  
-# 5 - Chain Diagnostics ---------------------------------------------------
+# 5 - Chain Diagnostics & Posterior Predictive Checks ---------------------------------------------------
 fit_repvote <- readRDS(here("ResearchNote/data/fit_repvote_model.rds"))
 
 ### 5.1 - TracePlots----------------------------------------------------------
@@ -170,7 +170,7 @@ ggsave(here("ResearchNote/outputs/diagnostics/traceplot_fixed_effects.png"), wid
 
 
 
-# 5.2 - RHat --------------------------------------------------------------
+### 5.2 - RHat --------------------------------------------------------------
 # R-Hat compares within-chain and between-chain variability
 # When all chains have converged to the same posterior distribution, R-hat ≈ 1.00.
 
@@ -203,7 +203,7 @@ summary(fit_repvote)
 # it means all of our chains have converged to the same posterior distribution
 
 
-# 5.3 - ESS (Effective Sample Size) ---------------------------------------
+### 5.3 - ESS (Effective Sample Size) ---------------------------------------
 # ESS tells us how many independent draws we effectively have from the posterior, 
     # accounting for autocorrelation in chains.
     # When using MCMC, samples are not independent due to autocorrelation. 
@@ -244,10 +244,32 @@ summary(fit_repvote)
 # means we have a healthy amount of independent draws 
 
 
+### 5.4 - Posterior Predictive Check ---------------------------------------------------
+# You simulate new data from your model using 
+# parameters drawn from the posterior distribution. Then, you compare 
+# these simulated data (called replicated data) to your 
+# actual observed data. The goal is to see whether your model is 
+# capable of generating data that look like what you actually observed.
+pp_check(fit_repvote, type = "dens_overlay") +
+  labs(title = "Posterior Predictive Check",
+       subtitle = "Ability of fitted model to replicate observed data")  +
+  theme_minimal() + 
+  theme(text = element_text(family = "Times New Roman"))
+        
+ggsave(here("ResearchNote/outputs/diagnostics/posterior_predictive_check.png"), width = 5, height = 5, dpi = 300)
+# If the blue lines (simulated data) 
+#    and black line (observed data) largely overlap, it suggests your model 
+# is capturing the distribution of the response variable well
+
+# helps with
+# A) Detect model misfit (e.g., if your model systematically underestimates or overestimates some patterns in the data).
+# B) Check for overdispersion or poor capturing of variance.
+# C) Ensure that the assumptions implied by your model structure and priors lead to reasonable inferences about the data.
+
 
 
 # 6 - Posterior Summaries ---------------------------------------------------------
-# 6.1 - simple estimate check -------------------------------------------------
+### 6.1 - simple estimate check -------------------------------------------------
 summary(fit_repvote)
 
 # Regression Coefficients:
@@ -261,6 +283,7 @@ summary(fit_repvote)
     # very likely to vote for republicans
     # that's fine; makes sense with the fact that the dataset includes independent voting too
     # and that it was crazy skewed towards democrats for some reason (bad surveying?)
+    # also the confidence interval remains inside the negative space (ie: doenst cross 0)
 # leftright self has a small effect, likely because its dist is so normal?
     # maybe also because of how many centrists there are
 # therm dems has the expected negative prediciton ability
@@ -286,7 +309,7 @@ summary(fit_repvote)
 
 
 
-# 6.2 - Visualization of estimates -------------------------------------------------
+### 6.2 - Visualization of estimates -------------------------------------------------
 # extract the posterior draws for deeper inspection:
 post <- as_draws_df(fit_repvote)
 
@@ -314,12 +337,155 @@ mcmc_areas(
 ggsave(here("ResearchNote/outputs/posterior/posteriorsummaries_stdevs.png"), width = 14, height = 6, dpi = 300)
 
 
-# POTENTIALLY THE GRAPH TO SHOW
-# income_level parameters - old
-fit_draws <- fit_repvote %>%
+
+
+
+# 7 - Advanced Visualizations ---------------------------------------
+### 7.1 - Group-Level Intercepts ---------------------------------------
+
+# 1. Extract population-level intercept
+global_intercept <- fit_repvote %>%
+  spread_draws(b_Intercept)
+
+# 2. Extract group-level intercept deviations
+group_intercepts <- fit_repvote %>%
   spread_draws(r_income_level[income_level, term]) %>%
-  filter(income_level %in% c(1:11),  # pick income groups to focus on
-         term %in% c("Intercept", "leftright_self", "therm_dems", "therm_reps"))
+  filter(term == "Intercept") %>%
+  mutate(income_level = as.character(income_level))
+
+# 3. Combine global and group-level intercepts
+combined_intercepts <- left_join(group_intercepts, global_intercept, 
+                                 by = ".draw") %>%
+  mutate(
+    intercept = b_Intercept + r_income_level,
+    income_level = factor(income_level, levels = as.character(1:11))
+  )
+
+ggplot(combined_intercepts, aes(y = income_level, x = intercept)) +
+  stat_pointinterval(.width = c(0.66, 0.90), point_size = 2, size = 1.1) +
+  geom_vline(xintercept = mean(global_intercept$b_Intercept), linetype = "dashed", color = "gray40") +
+  labs(
+    title = "Posterior Intercepts by Income Level",
+    #subtitle = "Caterpillar plot: global intercept + varying deviation",
+    x = "Intercept Estimate",
+    y = "Income Level (1 = Lowest, 11 = Highest)"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(text = element_text(family = "Times New Roman"),
+        legend.position = "none",
+        panel.background = element_rect(fill = "white", color = NA),  # White plot background
+        plot.background = element_rect(fill = "white", color = NA),   # White outer background
+        panel.grid.major = element_line(color = "gray90"),  # Light grid lines
+        panel.grid.minor = element_blank()) 
+
+ggsave(here("ResearchNote/outputs/posterior/posteriorestimates_intercepts.png"), width = 7, height = 7, dpi = 300)
+
+
+
+
+### 7.2 - Varying Slopes, Dem Rep ---------------------------------------
+
+# Dems and Reps
+# Step 1: Extract posterior summaries for global coefficients
+global_coefs <- fit_repvote %>%
+  spread_draws(b_therm_dems, b_therm_reps) %>%
+  summarise(
+    therm_dems = mean(abs(b_therm_dems)),
+    therm_reps = mean(abs(b_therm_reps))
+  ) %>%
+  pivot_longer(cols = everything(), names_to = "term", values_to = "global_coef") %>%
+  mutate(term = recode(term,
+                       therm_dems = "Thermometer: Democrats",
+                       therm_reps = "Thermometer: Republicans"))
+
+# Step 2: Extract group-level slopes
+posterior_slopes <- fit_repvote %>%
+  spread_draws(r_income_level[income_level, term]) %>%
+  filter(term %in% c("therm_dems", "therm_reps")) %>%
+  mutate(
+    slope = abs(r_income_level),  # compare magnitudes
+    income_level = factor(income_level, levels = as.character(1:11)),
+    term = recode(term,
+                  therm_dems = "Thermometer: Democrats",
+                  therm_reps = "Thermometer: Republicans")
+  )
+
+# Step 3: Plot
+ggplot(posterior_slopes, aes(x = slope, y = income_level, fill = term, color = term)) +
+  stat_halfeye(
+    .width = 0.90,
+    alpha = 0.6,
+    #position = position_dodge(width = 0.6),
+    slab_size = 0.6
+  ) +
+  # Add vertical lines at global coefficient values
+  geom_vline(data = global_coefs, aes(xintercept = global_coef, color = term),
+             linetype = "dashed", size = 0.8, show.legend = FALSE) +
+  labs(
+    title = "Varying Slope Estimates Across Income Levels",
+    subtitle = "Variables: Therm Dems and Reps; dashed lines = population-level slope",
+    x = "Group-Level Slope Estimates (Abs Values)",
+    y = "Income Level (1 = Lowest, 11 = Highest)"
+  ) +
+  scale_fill_manual(values = c("Thermometer: Democrats" = "skyblue", "Thermometer: Republicans" = "red")) +
+  scale_color_manual(values = c("Thermometer: Democrats" = "skyblue4", "Thermometer: Republicans" = "darkred")) +
+  theme_minimal(base_size = 13) +
+  theme(text = element_text(family = "Times New Roman"),
+        legend.position = "none",
+        panel.background = element_rect(fill = "white", color = NA),  # White plot background
+        plot.background = element_rect(fill = "white", color = NA),   # White outer background
+        panel.grid.major = element_line(color = "gray90"),  # Light grid lines
+        panel.grid.minor = element_blank())  # Remove minor grid lines +
+coord_cartesian(xlim = c(NA, 2.3))
+ggsave(here("ResearchNote/outputs/posterior/posteriorestimates_DEMREPS.png"), width = 9, height = 7, dpi = 300)
+
+# Each ridge shows uncertainty about the actual effect size of therm_dems on repvote_yn for that income group.
+# 
+# The ridge’s center (mean/median) is the combined slope:
+#   population-level effect + income-level deviation
+# 
+# The spread (width) reflects the posterior uncertainty for that group-specific slope.
+# 
+
+
+
+### 7.3 - Varying Slopes, LR Self ---------------------------------------
+
+# LR Self
+# Extract posterior draws for the varying slopes
+posterior_slopes <- fit_repvote %>%
+  spread_draws(r_income_level[income_level, term]) %>%
+  filter(term == "leftright_self") %>%
+  mutate(
+    slope = r_income_level,
+    income_level = factor(income_level, levels = as.character(1:11))  # ensure levels are ordered numerically
+  )
+
+ggplot(posterior_slopes, aes(x = slope, y = income_level)) +
+  stat_halfeye(.width = 0.95, # confidence interval
+               fill = "forestgreen", 
+               alpha = 0.45) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  labs(
+    title = "Varying Slopes of LeftRight by Income Level",
+    subtitle = "Estimate Deviations",
+    x = "Group-Specific Slope",
+    y = "Income Level (1 = Lowest, 11 = Highest)"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(text = element_text(family = "Times New Roman"),
+        legend.position = "none",
+        panel.background = element_rect(fill = "white", color = NA),  # White plot background
+        plot.background = element_rect(fill = "white", color = NA),   # White outer background
+        panel.grid.major = element_line(color = "gray90"),  # Light grid lines
+        panel.grid.minor = element_blank()) 
+      
+ggsave(here("ResearchNote/outputs/posterior/posteriorestimates_LR_sd.png"), width = 7, height = 7, dpi = 300)
+
+
+
+
+
 
 
 
@@ -403,6 +569,18 @@ ggplot(plot_data, aes(x = attention_pol_mean, y = intercept_estimate)) +
   labs(x = "Average Political Attention (Group)", y = "Estimated Intercept (Voting Republican)")
 
 
+# CHECK - Income group representation ---------------------------------------------------
+survey_prepped %>%
+  ggplot(aes(x = income_level)) +
+  geom_histogram(binwidth = 1, fill = "steelblue", color = "white") +
+  labs(title = "Income Level Representation in Dataset") +
+  theme_minimal() +
+  theme(text = element_text(family = "Times New Roman"))
+ggsave(here("ResearchNote/outputs/exploratory/distribution_byincome.png"), width = 6, height = 6, dpi = 300)
+
+
+  
+  
 
 # CHECK - Estimates vs simple filtering summary stats ------------------------------------
 # Get posterior predictive probabilities for all rows
@@ -487,7 +665,6 @@ ggplot(survey_long, aes(x = therm, fill = group, color = group)) +
   ggtitle("Therm Dist.: Dem and Rep") +
   theme_minimal()
 ggsave(here("ResearchNote/outputs/pre_therm_dem_and_rep.png"))
-
 
 
 

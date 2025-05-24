@@ -51,8 +51,50 @@ survey_clean <- survey_raw %>%
     ))
 
 
-#### NEED TO  ----------------------------------------
-#### NEED TO  ----------------------------------------
+
+
+# CLASS IMBALANCE: Incomes -------------------------------------------------
+# temp <- survey_raw %>%
+#   select("V242096x", # vote summary
+#          "V241566x", # income (household)
+#          "V242438", # left-right self-placement
+#          "V241166", # thermometer democrats
+#          "V241167", # thermometer republicans
+#          "V241004" # attention to politics
+#   ) %>%
+#   mutate(across(everything(), ~ ifelse(. < 0, # re-coding the ANES missing values as NA
+#                                        NA, .))) %>% # ANES uses -9, -8, -7 etc to mean different NA reasons
+#   drop_na() %>%
+#   group_by(V241566x) %>%
+#   summarize(counts = n())
+
+# some as few as 29 observations in raw data, 
+# and as few as 17 after we remove missing values across all our
+# variables of interest
+
+
+# CLASS IMBALANCE: D vs. R -------------------------------------------------
+# representative survey?
+# temp <- survey_raw %>%
+#   select("V242096x" ) %>% 
+#   mutate(across(everything(), ~ ifelse(. < 0, # re-coding the ANES missing values as NA
+#                                        NA, .))) %>% # ANES uses -9, -8, -7 etc to mean different NA reasons
+#     drop_na() %>%
+#   group_by(V242096x) %>%
+#   summarize( vote_prop = n())
+# 
+# 2201/ (2201+1747+ 4 + 13 + 25 +63)
+# 1747 / (2201+1747+ 4 + 13 + 25 +63)
+
+# no! we have a class imbalance, dems overrepresented
+# True (real-world) national popular vote counts put this proportion at 
+    # 49.8% Republican and 
+    # 48.3% Democrat (American Presidency Project, 2024), 
+# while this dataset over-represents the democratic vote, 
+  # with 54.3% voting Democrat and 
+    #only 43.1% voting Republican. 
+
+
 
 
 
